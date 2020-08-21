@@ -1,0 +1,2 @@
+[ALIF] Number of draws (edges): 0
+[ALIF] Number of collisions: 0
