@@ -1,5 +1,5 @@
 #
-# american fuzzy lop - LLVM instrumentation
+# american fuzzy lop++ - LLVM instrumentation
 # -----------------------------------------
 #
 # Written by Laszlo Szekeres <lszekeres@google.com> and
@@ -29,14 +29,14 @@ ifeq "$(shell uname)" "OpenBSD"
   LLVM_CONFIG ?= $(BIN_PATH)/llvm-config
   HAS_OPT = $(shell test -x $(BIN_PATH)/opt && echo 0 || echo 1)
   ifeq "$(HAS_OPT)" "1"
-    $(error llvm_mode needs a complete llvm installation (versions 3.8.0 up to 10) -> e.g. "pkg_add llvm-7.0.1p9")
+    $(error llvm_mode needs a complete llvm installation (versions 3.8.0 up to 11) -> e.g. "pkg_add llvm-7.0.1p9")
   endif
 else
   LLVM_CONFIG ?= llvm-config
 endif
 
 LLVMVER  = $(shell $(LLVM_CONFIG) --version 2>/dev/null )
-LLVM_UNSUPPORTED = $(shell $(LLVM_CONFIG) --version 2>/dev/null | egrep -q '^3\.[0-7]|^1[1-9]' && echo 1 || echo 0 )
+LLVM_UNSUPPORTED = $(shell $(LLVM_CONFIG) --version 2>/dev/null | egrep -q '^3\.[0-7]|^1[2-9]' && echo 1 || echo 0 )
 LLVM_NEW_API = $(shell $(LLVM_CONFIG) --version 2>/dev/null | egrep -q '^1[0-9]' && echo 1 || echo 0 )
 LLVM_MAJOR = $(shell $(LLVM_CONFIG) --version 2>/dev/null | sed 's/\..*//')
 LLVM_BINDIR = $(shell $(LLVM_CONFIG) --bindir 2>/dev/null)
@@ -48,7 +48,7 @@ ifeq "$(LLVMVER)" ""
 endif
 
 ifeq "$(LLVM_UNSUPPORTED)" "1"
-  $(warning llvm_mode only supports llvm versions 3.8.0 up to 10)
+  $(warning llvm_mode only supports llvm versions 3.8.0 up to 11)
 endif
 
 ifeq "$(LLVM_MAJOR)" "9"
@@ -64,16 +64,17 @@ ifeq "$(LLVM_APPLE)" "1"
   $(warning llvm_mode will not compile with Xcode clang...)
 endif
 
-CFLAGS      ?= -O3 -funroll-loops
-CFLAGS      += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign -I ../include/ \
+#CFLAGS      ?= -O3 -funroll-loops
+CFLAGS      += -O3 -funroll-loops -march=native -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign -I ../include/ \
                -DAFL_PATH=\"$(HELPER_PATH)\" -DBIN_PATH=\"$(BIN_PATH)\" \
-               -DLLVM_BINDIR=\"$(LLVM_BINDIR)\" -DVERSION=\"$(VERSION)\"
+               -DLLVM_BINDIR=\"$(LLVM_BINDIR)\" -DVERSION=\"$(VERSION)\" \
+               -DLLVM_VERSION=\"$(LLVMVER)\"
 ifdef AFL_TRACE_PC
   CFLAGS    += -DUSE_TRACE_PC=1
 endif
 
-CXXFLAGS    ?= -O3 -funroll-loops
-CXXFLAGS    += -Wall -D_FORTIFY_SOURCE=2 -g -I ../include/ \
+#CXXFLAGS    ?= -O3 -funroll-loops
+CXXFLAGS    += -O3 -funroll-loops -march=native -Wall -D_FORTIFY_SOURCE=2 -g -I ../include/ \
                -DVERSION=\"$(VERSION)\" -Wno-variadic-macros
 
 CLANG_CFL    = `$(LLVM_CONFIG) --cxxflags` -Wl,-znodelete -fno-rtti -fpic $(CXXFLAGS)
@@ -200,7 +201,7 @@ endif
 	ln -sf afl-clang-fast ../afl-clang-fast++
 
 ../libLLVMInsTrim.so: LLVMInsTrim.so.cc MarkNodes.cc | test_deps
-	$(CXX) $(CLANG_CFL) -DLLVMInsTrim_EXPORTS -fno-rtti -fPIC -std=$(LLVM_STDCXX) -shared $< MarkNodes.cc -o $@ $(CLANG_LFL)
+	-$(CXX) $(CLANG_CFL) -DLLVMInsTrim_EXPORTS -fno-rtti -fPIC -std=$(LLVM_STDCXX) -shared $< MarkNodes.cc -o $@ $(CLANG_LFL)
 
 ../afl-llvm-pass.so: afl-llvm-pass.so.cc | test_deps
 	$(CXX) $(CLANG_CFL) -DLLVMInsTrim_EXPORTS -fno-rtti -fPIC -std=$(LLVM_STDCXX) -shared $< -o $@ $(CLANG_LFL)
@@ -223,6 +224,17 @@ endif
 
 ../afl-llvm-rt-64.o: afl-llvm-rt.o.c | test_deps
 	@printf "[*] Building 64-bit variant of the runtime (-m64)... "
+	@$(CC) $(CFLAGS) -m64 -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+
+../afl-llvm-cmplog-rt.o: afl-llvm-cmplog-rt.o.c | test_deps
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+
+../afl-llvm-cmplog-rt-32.o: afl-llvm-cmplog-rt.o.c | test_deps
+	@printf "[*] Building 32-bit variant of the CmpLog runtime (-m32)... "
+	@$(CC) $(CFLAGS) -m32 -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+
+../afl-llvm-cmplog-rt-64.o: afl-llvm-cmplog-rt.o.c | test_deps
+	@printf "[*] Building 64-bit variant of the CmpLog runtime (-m64)... "
 	@$(CC) $(CFLAGS) -m64 -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
 
 test_build: $(PROGS)
@@ -261,5 +273,5 @@ vpath  % ..
 	ln -sf afl-clang-fast.8 ../afl-clang-fast++.8
 
 clean:
-	rm -f *.o *.so *~ a.out core core.[1-9][0-9]* .test2 test-instr .test-instr0 .test-instr1 
+	rm -f *.o *.so *~ a.out core core.[1-9][0-9]* .test2 test-instr .test-instr0 .test-instr1 afl-llvm-pass.dwo
 	rm -f $(PROGS) ../afl-clang-fast++ ../afl-clang-fast*.8

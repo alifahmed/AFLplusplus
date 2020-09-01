@@ -72,6 +72,7 @@ void read_bitmap(u8* fname) {
    it needs to be fast. We do this in 32-bit and 64-bit flavors. */
 
 u8 has_new_bits(u8* virgin_map) {
+u64 ttt = get_cur_time_us();
 
 #ifdef WORD_SIZE_64
 
@@ -139,7 +140,7 @@ u8 has_new_bits(u8* virgin_map) {
   }
 
   if (ret && virgin_map == virgin_bits) bitmap_changed = 1;
-
+map_compare_time += get_cur_time_us() - ttt;
   return ret;
 
 }
@@ -247,7 +248,7 @@ const u8 simplify_lookup[256] = {
 #ifdef WORD_SIZE_64
 
 void simplify_trace(u64* mem) {
-
+u64 ttt = get_cur_time_us();
   u32 i = MAP_SIZE >> 3;
 
   while (i--) {
@@ -274,7 +275,7 @@ void simplify_trace(u64* mem) {
     ++mem;
 
   }
-
+map_simplify_time += get_cur_time_us() - ttt;
 }
 
 #else
@@ -519,7 +520,7 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
   u8  keeping = 0, res;
 
   /* Update path frequency. */
-  u32 cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
+  u32 cksum = hash32_time(trace_bits, MAP_SIZE, HASH_CONST);
 
   struct queue_entry* q = queue;
   while (q) {
