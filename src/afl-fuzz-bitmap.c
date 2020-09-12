@@ -519,17 +519,6 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
   s32 fd;
   u8  keeping = 0, res;
 
-  /* Update path frequency. */
-  u32 cksum = hash32_time(trace_bits, MAP_SIZE, HASH_CONST);
-
-  struct queue_entry* q = queue;
-  while (q) {
-
-    if (q->exec_cksum == cksum) q->n_fuzz = q->n_fuzz + 1;
-
-    q = q->next;
-
-  }
 
   if (fault == crash_mode) {
 
@@ -537,10 +526,8 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
        future fuzzing, etc. */
 
     if (!(hnb = has_new_bits(virgin_bits))) {
-
       if (crash_mode) ++total_crashes;
       return 0;
-
     }
 
 #ifndef SIMPLE_FILES
@@ -557,13 +544,11 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
     add_to_queue(fn, len, 0);
 
     if (hnb == 2) {
-
       queue_top->has_new_cov = 1;
       ++queued_with_cov;
-
     }
 
-    queue_top->exec_cksum = cksum;
+    queue_top->exec_cksum = hash32_time(trace_bits, MAP_SIZE, HASH_CONST);
 
     /* Try to calibrate inline; this also calls update_bitmap_score() when
        successful. */
@@ -684,17 +669,6 @@ u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 #endif                                                    /* ^!SIMPLE_FILES */
 
       ++unique_crashes;
-      if (infoexec) {  // if the user wants to be informed on new crashes - do
-#if !TARGET_OS_IPHONE
-                       // that
-        if (system(infoexec) == -1)
-          hnb += 0;  // we dont care if system errors, but we dont want a
-                     // compiler warning either
-#else
-        WARNF("command execution unsupported");
-#endif
-
-      }
 
       last_crash_time = get_cur_time();
       last_crash_execs = total_execs;
