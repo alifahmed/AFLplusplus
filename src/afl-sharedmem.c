@@ -145,7 +145,7 @@ void setup_shm(unsigned char dumb_mode) {
 #else
   u8* shm_str;
 
-  shm_id = shmget(IPC_PRIVATE, MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
+  shm_id = shmget(IPC_PRIVATE, MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600 | SHM_HUGETLB);
 
   if (shm_id < 0) PFATAL("shmget() failed");
 
